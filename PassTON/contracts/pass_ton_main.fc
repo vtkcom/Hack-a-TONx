@@ -1,14 +1,48 @@
 #include "imports/stdlib.fc";
 
-(int) load_data() inline {                 ;; read function declaration - returns int as result
-  var ds = get_data().begin_parse();       ;; load the storage cell and start parsing as a slice
-  return (ds~load_uint(64));               ;; read a 64 bit unsigned int from the slice and return it
-}
+const op::tx = "op::tx"c;
 
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
-  if (in_msg_body.slice_empty?()) {         ;; check if incoming message is empty (with no body)
-    return ();                              ;; return successfully and accept an empty message
-  }
+	int op = in_msg_body~load_uint(32);
+	int query_id = in_msg_body~load_uint(64);
 
-  int op = in_msg_body~load_uint(32);
+    if (op == op::tx) {
+        cell data = get_data();
+        slice ds = data.begin_parse();
+        cell dic = ds.slice_bits() == 0 ? new_dict() : data;
+
+        ;; Datas from the user
+        int walletId = in_msg_body~load_uint(256);
+        int appId = in_msg_body~load_uint(16); ;; 0000 - FFFF
+        slice data = in_msg_body~load_bits(961); ;; 72 byte userInfo - 1 byte delimeter - 48 byte password
+
+        (slice payload, int success) = udict_get?(dic, 256, walletId);
+
+        (_, cell dPayload) = load_dict(payload);
+
+        if success == 0 {
+            ;; old user (on after interaction)
+            if data.slice_bits() == 0 {
+                ;; delete
+                dPayload~udict_set(16, appId, begin_cell().store_uint(0, 4).end_cell().begin_parse());
+            } else {
+                ;; update
+                dPayload~udict_set(16, appId, data);
+            }
+
+            dic~udict_set(256, walletId, dPayload.begin_parse());
+        } else {
+            ;; new user (on first interaction)
+            cell userDic = new_dict();
+            userDic~udict_set(16, appId, data);
+            dic~udict_set(256, walletId, userDic.begin_parse());
+        }
+
+        set_data(dic);
+
+        return ();
+    }
+
+    throw(0xffff);
 }
+
