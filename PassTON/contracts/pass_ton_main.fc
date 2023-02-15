@@ -1,48 +1,66 @@
 #include "imports/stdlib.fc";
 
-const op::tx = "op::tx"c;
-
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
-	int op = in_msg_body~load_uint(32);
-	int query_id = in_msg_body~load_uint(64);
-
-    if (op == op::tx) {
-        cell data = get_data();
-        slice ds = data.begin_parse();
-        cell dic = ds.slice_bits() == 0 ? new_dict() : data;
+	int op = in_msg_body~load_uint(1);
+    
+    if (op == 1) {
 
         ;; Datas from the user
-        int walletId = in_msg_body~load_uint(256);
-        int appId = in_msg_body~load_uint(16); ;; 0000 - FFFF
-        slice data = in_msg_body~load_bits(961); ;; 72 byte userInfo - 1 byte delimeter - 48 byte password
+        int walletId = in_msg_body~load_uint(256); ;; 48 byte
+        int appId = in_msg_body~load_uint(16); ;; 0000 - FFFF | 2 byte
+        slice data = in_msg_body~load_bits(360); ;; 45 byte
+        slice pass = in_msg_body~load_bits(240); ;; 30 byte
 
-        (slice payload, int success) = udict_get?(dic, 256, walletId);
-
-        (_, cell dPayload) = load_dict(payload);
-
-        if success == 0 {
-            ;; old user (on after interaction)
-            if data.slice_bits() == 0 {
-                ;; delete
-                dPayload~udict_set(16, appId, begin_cell().store_uint(0, 4).end_cell().begin_parse());
-            } else {
-                ;; update
-                dPayload~udict_set(16, appId, data);
-            }
-
-            dic~udict_set(256, walletId, dPayload.begin_parse());
-        } else {
-            ;; new user (on first interaction)
-            cell userDic = new_dict();
-            userDic~udict_set(16, appId, data);
-            dic~udict_set(256, walletId, userDic.begin_parse());
+        slice local_storage = get_data().begin_parse();
+        
+        cell dictionary_cell = new_dict();
+        
+        if (~ slice_empty?(local_storage)) {
+            dictionary_cell = local_storage~load_dict();
         }
 
-        set_data(dic);
+        (slice user_dictionary, int success) = dictionary_cell.udict_get?(256, walletId);
+        var userDic = success == -1 ? user_dictionary~load_dict() : new_dict();
 
+        userDic~udict_set(16, appId, begin_cell().store_slice(data).store_slice(pass).end_cell().begin_parse());
+        dictionary_cell~udict_set(256, walletId, begin_cell().store_dict(userDic).end_cell().begin_parse());
+        set_data(begin_cell().store_dict(dictionary_cell).end_cell());
         return ();
     }
 
     throw(0xffff);
 }
+
+(slice) returnAllData(int key, int appId) method_id {
+    ;; Tüm dictionary çekiliyor
+    var main_dictionary = get_data().begin_parse();
+    var loaded_dict = main_dictionary~load_dict();
+    
+    ;; Dictionary içerisinden key ile arama yapılıyor
+    (slice user_dictionary, int success) = loaded_dict.udict_get?(256, key);
+
+    var loaded_user_dictionary = user_dictionary~load_dict();
+
+    (slice user_data, int success2) = loaded_user_dictionary.udict_get?(16, appId);
+
+    return (user_data);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
