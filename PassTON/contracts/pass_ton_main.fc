@@ -31,17 +31,12 @@
     throw(0xffff);
 }
 
-(slice) returnAllData(int key, int appId) method_id {
-    ;; Tüm dictionary çekiliyor
+(cell) userData(int key) method_id {
     var main_dictionary = get_data().begin_parse();
     var loaded_dict = main_dictionary~load_dict();
-    
-    ;; Dictionary içerisinden key ile arama yapılıyor
     (slice user_dictionary, int success) = loaded_dict.udict_get?(256, key);
 
     var loaded_user_dictionary = user_dictionary~load_dict();
 
-    (slice user_data, int success2) = loaded_user_dictionary.udict_get?(16, appId);
-
-    return (user_data);
+    return (loaded_user_dictionary);
 }

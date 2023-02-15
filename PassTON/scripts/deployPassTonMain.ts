@@ -4,16 +4,13 @@ import {
     BitString,
     Cell,
     Contract,
-    ContractABI,
     contractAddress,
     ContractProvider,
+    Dictionary,
     Sender,
-    serializeTuple,
     toNano,
 } from 'ton-core';
-import { PassTonMain } from '../wrappers/PassTon';
 import { compile, NetworkProvider } from '@ton-community/blueprint';
-import { Maybe } from 'ton-core/dist/utils/maybe';
 import { Blockchain } from '@ton-community/sandbox';
 
 export default class PassTon implements Contract {
@@ -61,18 +58,15 @@ export default class PassTon implements Contract {
     }
 
     async getter(provider: ContractProvider) {
-        const { stack } = await provider.get('returnAllData', [
+        const { stack } = await provider.get('userData', [
             {
                 type: 'int',
                 value: BigInt(1),
             },
-            {
-                type: 'int',
-                value: BigInt(1002),
-            },
         ]);
-        var userData = stack.readString();
-        console.log(userData);
+        const mainDictionaryOfUser = stack.readCell().beginParse();
+
+        console.log(mainDictionaryOfUser);
         return stack;
     }
 }
